@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>Document Check App</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <div id="header">
+        <h1>ドキュメントチェックアプリ</h1>
+    </div>
+    <form action="/upload/" method="post" enctype="multipart/form-data">
+        <input type="file" id="file_input" name="files" accept=".doc,.docx,.pdf" multiple>
+        <textarea id="check_points" name="check_points" placeholder="確認観点を記入してください"></textarea>
+        <button type="submit">送信</button>
+    </form>
+    <div id="response_area">
+        <p id="response_output"></p>
+    </div>
+</body>
+</html>
