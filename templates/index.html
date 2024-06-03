@@ -1,21 +1,122 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-    <meta charset="UTF-8">
-    <title>Document Check App</title>
-    <link rel="stylesheet" href="/static/css/style.css">
+<meta charset="UTF-8">
+<title>テキスト入力と表示</title>
+<link rel="stylesheet" href="/static/css/styles.css">
 </head>
+
 <body>
-    <div id="header">
-        <h1>ドキュメントチェックアプリ</h1>
+<header class="header-class">
+
+    <h1>Document Easy Check</h1>
+
+    <p>このアプリでは、入力文章 or 読み込んだドキュメントに関して、指定の観点でチェックを行います</p>
+</header>
+
+<div class="container">
+    <div class="panel">
+        <h2>入力</h2>
+        <textarea id="inputText"></textarea>
+        <h4>ファイルを読み込む:</h4>
+        <input type="file" id="fileInput" onchange="uploadFile()">
+        <h4>チェックポイント:</h4>
+        <label><input type="checkbox" id="typoCheck" checked> 誤字脱字、タイプミス</label><br>
+        <label><input type="checkbox" id="syntaxCheck"> 主語と述語の組み合わせが間違っている箇所</label><br>
+        <label><input type="checkbox" id="punctuationCheck"> 句読点やカンマ、ピリオドの打ち方に不自然な点がある箇所</label><br>
+        <label><input type="checkbox" id="additionalCheck"> 追加のチェック観点</label><br>
+        <textarea id="additionalInput" class="small-textarea" disabled></textarea>
+        <button onclick="execute()">実行</button>
+        <button onclick="clearText()">クリア</button>
     </div>
-    <form action="/upload/" method="post" enctype="multipart/form-data">
-        <input type="file" id="file_input" name="files" accept=".doc,.docx,.pdf" multiple>
-        <textarea id="check_points" name="check_points" placeholder="確認観点を記入してください"></textarea>
-        <button type="submit">送信</button>
-    </form>
-    <div id="response_area">
-        <p id="response_output"></p>
+
+    <div class="panel">
+        <h2>結果</h2>
+        <div id="outputText"></div>
     </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            document.getElementById('additionalCheck').addEventListener('change', toggleAdditionalInput);
+        });
+
+        async function uploadFile() {
+        const fileInput = document.getElementById('fileInput');
+        const file = fileInput.files[0];
+        if (!file) return;
+        
+        const formData = new FormData();
+        formData.append('file', file);
+
+        try {
+            const response = await fetch('/upload-file', {
+                method: 'POST',
+                body: formData
+            });
+            const result = await response.json();
+            console.log(result);  // レスポンスの内容をコンソールに表示
+            
+            // テキストエリアにサーバーからの応答をセット
+            document.getElementById('inputText').value = result.content;
+        } catch (error) {
+            console.error('Error uploading file:', error);
+        }
+        }
+        
+
+        function toggleAdditionalInput() {
+            const additionalInput = document.getElementById('additionalInput');
+            additionalInput.disabled = !document.getElementById('additionalCheck').checked;
+        }
+
+        async function execute() {
+        var inputText = document.getElementById("inputText").value;
+        var additionalText = getAdditionalCheckInput();
+        var checkPoints = getCheckPoints();
+        const data = {
+            inputText: inputText,
+            additionalText: additionalText,
+            checkPoints: checkPoints
+        };
+        try {
+            const response = await fetch('/execute', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(data)
+            });
+            const result = await response.json();
+            document.getElementById("outputText").innerText = result.result;
+        } catch (error) {
+            console.error('Error executing request:', error);
+        }
+        }
+
+        function getCheckPoints() {
+        const checkPoints = [];
+        if (document.getElementById('typoCheck').checked) checkPoints.push('誤字脱字、タイプミス');
+        if (document.getElementById('syntaxCheck').checked) checkPoints.push('主語と述語の組み合わせが間違っている箇所');
+        if (document.getElementById('punctuationCheck').checked) checkPoints.push('句読点やカンマ、ピリオドの打ち方に不自然な点がある箇所');
+        if (document.getElementById('additionalCheck').checked) checkPoints.push('追加のチェック観点');
+        return checkPoints.join(',');
+        }
+
+        function getAdditionalCheckInput() {
+        if (document.getElementById('additionalCheck').checked) {
+            return document.getElementById('additionalInput').value;
+        }
+        return '';
+        }
+
+        async function clearText() {
+            document.getElementById("inputText").value = "";
+            document.getElementById("additionalInput").value = "";
+            document.getElementById("outputText").innerText = "";
+            document.querySelectorAll('input[type=checkbox]').forEach(checkbox => checkbox.checked = false);
+            document.getElementById('additionalInput').disabled = true;
+            document.getElementById('typoCheck').checked = true;
+        }
+    </script>
 </body>
 </html>
