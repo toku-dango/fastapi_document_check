@@ -1,0 +1,143 @@
+SAMLログイン
+
+SAMLログインとは、セキュリティアサーションマークアップ言語（SAML）を使用した認証プロセスのことです。
+SAMLは、異なるドメイン間でのユーザー認証や権限付与情報を交換するためのオープンスタンダードです。
+主に企業が複数のWebアプリケーションやサービスにわたってシングルサインオン（SSO）を実現するために使用されます。
+
+
+【SAMLログインのプロセスは次のように進行します】
+ユーザーのアクセス要求：ユーザーがSAMLをサポートするアプリケーションにログインしようとします。
+サービスプロバイダー（SP）からの認証要求：アプリケーション（サービスプロバイダー）はユーザーを認証サービス（アイデンティティプロバイダー、IdP）へリダイレクトします。
+アイデンティティプロバイダー（IdP）による認証：アイデンティティプロバイダーはユーザーのアイデンティティを確認し、認証された情報を含むSAMLアサーションを生成します。
+サービスプロバイダーへのアサーション送信：SAMLアサーションはサービスプロバイダーに送られ、ユーザーが認証されたことを示します。
+アクセス許可：サービスプロバイダーはSAMLアサーションを解析し、ユーザーに対して適切なアクセス権を付与します。
+このプロセスにより、ユーザーは一度のログインで複数のアプリケーションやサービスにアクセスできるようになり、
+異なるシステム間でのセキュアなユーザー情報の共有が可能になります。
+
+【シングルサインオン】
+シングルサインオン（SSO）は、ユーザーが一度の認証（ログイン）で複数の関連するが
+独立したソフトウェアシステムにアクセスできる認証方法です。
+→つまり！一度Azure ID認証すると、関連サービスに全てログインできること！！！
+
+
+SSOは主に、ユーザーが複数のアプリケーションやサービスを利用する際に、
+一つのアカウントとパスワードでログインすることができるようにするために使用されます。
+これにより、ユーザーエクスペリエンスが向上し、パスワード管理の負担が減少します。
+
+SSOの利点
+利便性：ユーザーは複数のログイン情報を覚える必要がなく、一度の認証で複数のサービスにアクセスできます。
+セキュリティの強化：一つのアカウントとパスワードで管理できるため、パスワードの複雑性を高めやすくなります。
+また、セキュリティポリシーを一元的に管理できるため、セキュリティレベルが向上します。
+管理の効率化：システム管理者はユーザー認証を一か所で管理できるため、効率が向上します。
+
+SSOの実装方法
+SSOの実装には複数の技術やプロトコルが存在しますが、一般的には以下のようなものがあります：
+
+SAML（Security Assertion Markup Language）：セキュリティアサーションマークアップ言語を用いたSSO。
+XMLベースで、アイデンティティプロバイダ（IdP）とサービスプロバイダ（SP）間でユーザー情報を交換します。
+OpenID Connect：OAuth 2.0プロトコルをベースにした認証レイヤー。よりシンプルでJSONベースの実装が特徴です。
+LDAP（Lightweight Directory Access Protocol）：ディレクトリサービスにアクセスするためのプロトコルで、
+内部ネットワークでのSSOによく使用されます。
+
+＿＿＿＿＿＿＿＿＿＿＿＿＿＿＿＿＿
+
+①SAML設定の準備
+Azure ADでアプリケーションを登録し、SAML SSO設定を完了させる必要があります。
+Azureポータルでアプリケーションを設定し、次の情報を取得します。
+
+・Entity ID
+・SSO service URL
+・X.509 Certificate
+→これらでSAMLファイルを作る
+
+②コード作成
+1.
+FastAPI エンドポイント: /api/saml/login
+ユーザーがこのエンドポイントにアクセスすると、サーバーはSAMLログインリクエストを作成します。
+SAMLリクエストは、設定されたIdentity Provider (IdP、この場合はAzure AD) へのリダイレクトURLを生成します。
+ユーザーはこのURLにリダイレクトされ、Azure ADのログインページに到達します。
+
+2.
+ユーザーがAzure ADのログインフォームに資格情報を入力すると、Azure ADはユーザーの身元を確認し、
+SAMLレスポンスを生成して、事前に設定されたAssertion Consumer Service (ACS) URL
+（つまり、あなたのサーバーの特定のエンドポイント）にポストします。
+
+FastAPI エンドポイント: /api/saml/acs
+このエンドポイントは、Azure ADからのSAMLレスポンスを受け取ります。
+受け取ったSAMLレスポンスを処理し、ユーザーの認証情報を確認します。
+エラーがなければ、ユーザーのセッションを作成し、ユーザーを認証済みとして扱います。
+
+3. ユーザーセッションの管理
+ユーザーが正常に認証された後、その情報（例えばユーザー名や役割など）はサーバーによってセッションに保存され、以降のリクエストに使用されます。
+ユーザーがログアウトを選択した場合、そのセッションは破棄され、ユーザーは再度ログインする必要があります。
+セキュリティとプライバシー
+SAML認証を実装する際には、セキュリティとプライバシーを確保するためにHTTPSを使用して通信を暗号化し、
+セキュアなトークンの取り扱いとセッション管理に注意を払う必要があります。また、X.509証明書を適切に管理し、
+IdPとの間で信頼を維持することが重要です。
+
+
+from fastapi import FastAPI, Request, Depends, HTTPException
+from onelogin.saml2.auth import OneLogin_Saml2_Auth
+from onelogin.saml2.utils import OneLogin_Saml2_Utils
+import uvicorn
+import json
+
+app = FastAPI()
+
+def prepare_saml_request(request: Request):
+    url_data = {
+        "https": "on" if request.url.scheme == "https" else "off",
+        "http_host": request.url.netloc,
+        "server_port": request.url.port,
+        "script_name": request.url.path,
+        "get_data": dict(request.query_params),
+        "post_data": dict(request._form)
+    }
+    return url_data
+
+def init_saml_auth(req):
+    auth = OneLogin_Saml2_Auth(req, custom_base_path="path_to_saml")
+    return auth
+
+@app.get("/api/saml/login")
+def saml_login(request: Request):
+    req = prepare_saml_request(request)
+    auth = init_saml_auth(req)
+    return {"url": auth.login()}
+
+@app.post("/api/saml/acs")
+async def saml_acs(request: Request):
+    req = prepare_saml_request(request)
+    auth = init_saml_auth(req)
+    auth.process_response()
+    errors = auth.get_errors()
+    if errors:
+        raise HTTPException(status_code=401, detail="SAML authentication failed: " + ', '.join(errors))
+    
+    # 認証が成功したら、index.htmlにリダイレクト
+    response = RedirectResponse(url="/static/index.html", status_code=303)
+    return response
+
+if __name__ == "__main__":
+    uvicorn.run(app, host="0.0.0.0", port=8000)
+
+
+
+1. /api/saml/login エンドポイント
+このエンドポイントは、ユーザーが認証プロセスを開始するためにアクセスします。ここでの処理ステップは次の通りです：
+
+ユーザーがこのエンドポイントを呼び出します。
+prepare_saml_request 関数が HTTP リクエストから必要な情報を整理します。
+init_saml_auth 関数を使って、SAML認証オブジェクトを初期化します。
+auth.login() メソッドを実行して、IdP（この場合は Azure AD）のログインページへのリダイレクトURLを生成します。
+ユーザーはこのURLにリダイレクトされ、ログインページで資格情報を入力します。
+2. /api/saml/acs エンドポイント
+ユーザーが IdP のログインページで資格情報を正しく入力し、認証が成功すると、IdPはユーザーをこのエンドポイントにリダイレクトし、SAMLレスポンスをPOSTとして送信します。このエンドポイントの処理は次の通りです：
+
+SAMLレスポンスがPOSTデータとしてこのエンドポイントに到達します。
+再びprepare_saml_requestとinit_saml_authを使用して、リクエストデータを整理し、SAML認証オブジェクトを初期化します。
+auth.process_response() を呼び出して、IdPから受け取ったSAMLレスポンスを処理します。
+エラーが存在しないか確認します。エラーがある場合は、適切なHTTPステータスコードとエラーメッセージを返します。
+エラーがなければ、ユーザーの認証情報（属性）を取得して返します。
+このフローにより、FastAPIを使って、Azure ADと連携したSAML認証システムを構築できます。エンドユーザーは、ほぼ透過的にログインでき、アプリケーションは安全にユーザーの認証情報を取得できます。
+
